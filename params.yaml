@@ -11,3 +11,4 @@ training:
   lr: 1e-4
   memory_size: 10000
   n_episodes: 100
+  checkpoint_frequency: 10

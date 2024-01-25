@@ -1,0 +1,29 @@
+schema: '2.0'
+stages:
+  train_model:
+    cmd: python src/training.py
+    deps:
+    - path: src/model.py
+      hash: md5
+      md5: c3fc1d8cdb9bb40b5f1f98465f227b4f
+      size: 724
+    - path: src/training.py
+      hash: md5
+      md5: d9bca44e1408c87c2fb36ffbe0f049f0
+      size: 6081
+    params:
+      params.yaml:
+        training.batch_size: 128
+        training.eps_decay: 1000
+        training.eps_end: 0.05
+        training.eps_start: 0.9
+        training.gamma: 0.99
+        training.lr: 0.0001
+        training.memory_size: 10000
+        training.n_episodes: 100
+        training.tau: 0.005
+    outs:
+    - path: data/models/policy_net_model.pt
+      hash: md5
+      md5: 1ff459821f27feea74039aa27b8749b6
+      size: 73122

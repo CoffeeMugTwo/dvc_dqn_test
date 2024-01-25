@@ -1,0 +1,34 @@
+params:
+- params.yaml
+- dvclive/params.yaml
+stages:
+
+  train_model:
+    cmd: python src/training.py
+
+    deps:
+    - src/training.py
+    - src/model.py
+
+    outs:
+    - data/models/policy_net_model.pt
+
+    params:
+    - training.batch_size
+    - training.gamma
+    - training.eps_start
+    - training.eps_end
+    - training.eps_decay
+    - training.tau
+    - training.lr
+    - training.memory_size
+    - training.n_episodes
+metrics:
+- dvclive/metrics.json
+plots:
+- dvclive/plots/metrics:
+    x: step
+artifacts:
+  policy_net:
+    path: data/models/policy_net_model.pt
+    type: model

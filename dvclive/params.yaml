@@ -1,0 +1,26 @@
+params.yaml:env:
+  test_param: 500
+params.yaml:training:
+  batch_size: 128
+  gamma: 0.99
+  eps_start: 0.9
+  eps_end: 0.05
+  eps_decay: 1000
+  tau: 0.005
+  lr: 0.0001
+  memory_size: 10000
+  n_episodes: 100
+  checkpoint_frequency: 10
+dvclive/params.yaml:env:
+  test_param: 500
+dvclive/params.yaml:training:
+  batch_size: 128
+  gamma: 0.99
+  eps_start: 0.9
+  eps_end: 0.05
+  eps_decay: 1000
+  tau: 0.005
+  lr: 0.0001
+  memory_size: 10000
+  n_episodes: 100
+  checkpoint_frequency: 10

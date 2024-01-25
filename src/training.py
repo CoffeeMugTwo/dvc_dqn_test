@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 import dvc.api
+from dvclive import Live
 
 from replay_memory import ReplayMemory
 from replay_memory import Transition
@@ -20,18 +21,21 @@ from model import DQN
 # Get Parameter
 PARAM_DICT = dvc.api.params_show()
 
-EPS_START = PARAM_DICT["training"]["eps_start"]
-EPS_END = PARAM_DICT["training"]["eps_end"]
-EPS_DECAY = PARAM_DICT["training"]["eps_decay"]
+print(PARAM_DICT)
 
-BATCH_SIZE = PARAM_DICT["training"]["batch_size"]
-GAMMA = PARAM_DICT["training"]["gamma"]
-TAU = PARAM_DICT["training"]["tau"]
-LR = PARAM_DICT["training"]["lr"]
+EPS_START = PARAM_DICT["params.yaml:training"]["eps_start"]
+EPS_END = PARAM_DICT["params.yaml:training"]["eps_end"]
+EPS_DECAY = PARAM_DICT["params.yaml:training"]["eps_decay"]
 
-REPLAY_MEMORY_SIZE = PARAM_DICT["training"]["memory_size"]
+BATCH_SIZE = PARAM_DICT["params.yaml:training"]["batch_size"]
+GAMMA = PARAM_DICT["params.yaml:training"]["gamma"]
+TAU = PARAM_DICT["params.yaml:training"]["tau"]
+LR = PARAM_DICT["params.yaml:training"]["lr"]
 
-N_EPISODES = PARAM_DICT["training"]["n_episodes"]
+REPLAY_MEMORY_SIZE = PARAM_DICT["params.yaml:training"]["memory_size"]
+
+N_EPISODES = PARAM_DICT["params.yaml:training"]["n_episodes"]
+CHECKPOINT_FREQUENCY = PARAM_DICT["params.yaml:training"]["checkpoint_frequency"]
 
 # Get correct device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -128,50 +132,72 @@ def optimize_model():
 
 def main():
 
-    for i_episode in range(N_EPISODES):
-        # Initialize the environment and get it's state
-        state, info = env.reset()
-        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-        min_distance = 99
-        for t in count():
-            action = select_action(state)
-            observation, reward, terminated, truncated, _ = env.step(action.item())
-            distance_to_goal = np.abs(0.5 - observation[0])
-            reward = torch.tensor([reward], device=device)
-            if distance_to_goal < min_distance:
-                min_distance = distance_to_goal
-            done = terminated or truncated
 
-            if terminated:
-                next_state = None
-            else:
-                next_state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
+    with Live() as live:
 
-            # Store the transition in memory
-            memory.push(state, action, next_state, reward)
+        live.log_params(PARAM_DICT)
 
-            # Move to the next state
-            state = next_state
+        for i_episode in range(N_EPISODES):
+            # Initialize the environment and get it's state
+            state, info = env.reset()
+            state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+            min_distance = 99
+            for t in count():
+                action = select_action(state)
+                observation, reward, terminated, truncated, _ = env.step(action.item())
+                distance_to_goal = np.abs(0.5 - observation[0])
+                reward = torch.tensor([reward], device=device)
+                if distance_to_goal < min_distance:
+                    min_distance = distance_to_goal
+                done = terminated or truncated
 
-            # Perform one step of the optimization (on the policy network)
-            optimize_model()
+                if terminated:
+                    next_state = None
+                else:
+                    next_state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
 
-            # Soft update of the target network's weights
-            # θ′ ← τ θ + (1 −τ )θ′
-            target_net_state_dict = target_net.state_dict()
-            policy_net_state_dict = policy_net.state_dict()
-            for key in policy_net_state_dict:
-                target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
-            target_net.load_state_dict(target_net_state_dict)
+                # Store the transition in memory
+                memory.push(state, action, next_state, reward)
 
-            if done:
-                # episode_durations.append(t + 1)
-                rewards_list.append(min_distance)
+                # Move to the next state
+                state = next_state
 
-                # debug
-                print(f"Episode {i_episode} | Min. Distance = {min_distance}")
-                # plot_rewards()
-                break
+                # Perform one step of the optimization (on the policy network)
+                optimize_model()
+
+                # Soft update of the target network's weights
+                # θ′ ← τ θ + (1 −τ )θ′
+                target_net_state_dict = target_net.state_dict()
+                policy_net_state_dict = policy_net.state_dict()
+                for key in policy_net_state_dict:
+                    target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
+                target_net.load_state_dict(target_net_state_dict)
+
+                if done:
+                    # episode_durations.append(t + 1)
+                    rewards_list.append(min_distance)
+                    live.log_metric("min_distance", min_distance)
+
+                    # debug
+                    print(f"Episode {i_episode} | Min. Distance = {min_distance}")
+                    # plot_rewards()
+                    break
+
+            if (i_episode + 1) % CHECKPOINT_FREQUENCY == 0:
+                torch.save(policy_net, f"data/model_checkpoints/policy_net_episode{i_episode + 1}.pt")
+
+            live.next_step()
+
+        torch.save(
+            policy_net,
+            "data/models/policy_net_model.pt"
+        )
+
+        live.log_artifact(
+            "data/models/policy_net_model.pt",
+            type="model",
+            name="policy_net"
+        )
 
 
 if __name__ == "__main__":
